@@ -1,0 +1,264 @@
+using System;
+using System.Linq; // Consultas de datos de manera sencilla (filtro, ordenación, etc.).
+using System.Text; // Manipulación de cadenas de texto.
+using System.Text.RegularExpressions; // Manejo de expresiones regulares para búsqueda y manipulación de texto.
+using System.Security.Cryptography; // Criptografía, incluyendo hashing y cifrado de datos.
+using System.Threading; // Manejo de operaciones concurrentes y temporizadores.
+
+class SafePassApp
+{
+    static Random rand = new Random(); // Instanciamos un generador de números aleatorios
+
+    static void Main(string[] args)
+    {
+        // Mensajes de bienvenida
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        PrintBoxedMessage("Bienvenido a SafePass");
+        PrintBoxedMessage("Creación y Verificación de Contraseñas Seguras");
+        Console.ResetColor();
+
+        // Solicitar el nombre de usuario
+        PrintSectionHeader("Registro de Usuario");
+        PrintQuestion("Ingrese su nombre de usuario: ");
+        Console.ForegroundColor = ConsoleColor.Green;
+        string username = Console.ReadLine(); // Guardamos el nombre de usuario
+        Console.ResetColor();
+
+        // Selección del método de verificación en dos pasos
+        PrintSectionHeader("Verificación en Dos Pasos");
+        PrintQuestion("Seleccione el método de verificación en dos pasos:");
+        PrintQuestion("[1] Código de verificación por SMS");
+        PrintQuestion("[2] Código de verificación por correo electrónico");
+        Console.ForegroundColor = ConsoleColor.Green;
+        string verificationMethod = Console.ReadLine(); // El usuario elige el método de verificación
+        Console.ResetColor();
+
+        // Generación y verificación del código de verificación
+        if (verificationMethod == "1" || verificationMethod == "2")
+        {
+            string verificationCode = GenerateVerificationCode(); // Generamos un código de verificación
+            LoadingAnimation("Generando código de verificación"); // Animación de carga
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Código de verificación (simulado): {verificationCode}"); // Mostramos el código generado (simulado)
+            Console.ResetColor();
+
+            PrintQuestion("Ingrese el código de verificación: ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string userCode = Console.ReadLine(); // El usuario ingresa el código recibido
+            Console.ResetColor();
+
+            // Verificamos si el código ingresado es correcto
+            if (userCode != verificationCode)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                PrintBoxedMessage("Código incorrecto. Verificación fallida.");
+                Console.ResetColor();
+                return;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            PrintBoxedMessage("Verificación exitosa.");
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            PrintBoxedMessage("Opción de verificación no válida.");
+            Console.ResetColor();
+            return;
+        }
+
+        // Creación de la contraseña
+        PrintSectionHeader("Creación de Contraseña");
+        PrintQuestion("Ingrese su contraseña: ");
+        Console.ForegroundColor = ConsoleColor.Green;
+        string password = Console.ReadLine(); // Guardamos la contraseña
+        Console.ResetColor();
+
+        // Validación de la seguridad de la contraseña
+        LoadingAnimation("Verificando seguridad de la contraseña");
+        var validation = ValidatePassword(password); // Validamos la seguridad de la contraseña
+
+        if (!validation.isValid)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            PrintBoxedMessage($"Contraseña débil: {validation.recommendation}"); // Mostramos recomendaciones si la contraseña no es segura
+            Console.ResetColor();
+
+            PrintQuestion("¿Desea que se le recomiende una contraseña segura? (S/N): ");
+            Console.ForegroundColor = ConsoleColor.Green;
+            string response = Console.ReadLine().ToUpper(); // Preguntamos si quieren una recomendación
+            Console.ResetColor();
+
+            if (response == "S")
+            {
+                password = GenerateStrongPassword(); // Generamos una contraseña segura
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                PrintBoxedMessage($"Recomendación de contraseña segura: {password}"); // Mostramos la contraseña segura recomendada
+                Console.ResetColor();
+            }
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            PrintBoxedMessage("Contraseña fuerte creada.");
+            Console.ResetColor();
+        }
+
+        // Generamos un sal y hasheamos la contraseña
+        string salt = GenerateSalt(); // Generamos un "sal" aleatorio
+        string hashedPassword = GenerateHashWithSalt(password, salt); // Hasheamos la contraseña con el sal
+
+        // Preguntar si desean convertir la contraseña a un sistema de numeración específico
+        PrintQuestion("¿Desea convertir la contraseña a un sistema de numeración específico?");
+        PrintQuestion("1. No");
+        PrintQuestion("2. Binario");
+        PrintQuestion("3. Octal");
+        PrintQuestion("4. Hexadecimal");
+        PrintQuestion("5. Todo");
+        Console.ForegroundColor = ConsoleColor.Green;
+        string conversionOption = Console.ReadLine(); // El usuario elige el sistema de numeración
+        Console.ResetColor();
+
+        // Convertimos la contraseña según la opción seleccionada
+        string convertedPassword = ConvertPassword(password, conversionOption);
+
+        // Mostramos la contraseña generada y convertida
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        PrintBoxedMessage($"Contraseña Generada: {password}");
+        PrintBoxedMessage($"Contraseña Convertida: {convertedPassword}");
+        PrintBoxedMessage($"Contraseña Hasheada: {hashedPassword}");
+        Console.ResetColor();
+
+        // Mostrar la tabla de codificación de la contraseña
+        PrintSectionHeader("Tabla de Codificación de la Contraseña");
+        DisplayEncodingTable(password); // Mostramos la tabla con los valores ASCII, binarios y hexadecimales de cada carácter de la contraseña
+
+        PrintBoxedMessage("¡Contraseña creada y verificada exitosamente!");
+    }
+
+    // Método para generar un código de verificación de 6 dígitos
+    static string GenerateVerificationCode()
+    {
+        return rand.Next(100000, 999999).ToString(); // Generamos un número aleatorio de 6 dígitos
+    }
+
+    // Método para validar la contraseña
+    static (bool isValid, string recommendation) ValidatePassword(string password)
+    {
+        bool isLongEnough = password.Length >= 12; // Validamos que la contraseña tenga al menos 12 caracteres
+        bool hasUpper = password.Any(char.IsUpper); // Verificamos si tiene al menos una letra mayúscula
+        bool hasLower = password.Any(char.IsLower); // Verificamos si tiene al menos una letra minúscula
+        bool hasDigit = password.Any(char.IsDigit); // Verificamos si tiene al menos un número
+        bool hasSpecialChar = password.Any(c => "!@#$%^&*()_-+=<>?/".Contains(c)); // Verificamos si tiene al menos un carácter especial
+
+        if (isLongEnough && hasUpper && hasLower && hasDigit && hasSpecialChar)
+        {
+            return (true, ""); // La contraseña es segura si cumple con todas las condiciones
+        }
+
+        string recommendation = "Para mejorar la seguridad: ";
+        if (!isLongEnough) recommendation += "Al menos 12 caracteres. ";
+        if (!hasUpper) recommendation += "Incluya una mayúscula. ";
+        if (!hasLower) recommendation += "Incluya una minúscula. ";
+        if (!hasDigit) recommendation += "Incluya un número. ";
+        if (!hasSpecialChar) recommendation += "Incluya un carácter especial."; // Recomendamos lo que falta en la contraseña
+
+        return (false, recommendation);
+    }
+
+    // Método para generar una contraseña segura
+    static string GenerateStrongPassword()
+    {
+        string allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=<>?/"; // Caracteres permitidos para la contraseña
+        StringBuilder password = new StringBuilder();
+        for (int i = 0; i < 12; i++) // Generamos una contraseña de 12 caracteres
+        {
+            password.Append(allowedChars[rand.Next(allowedChars.Length)]); // Seleccionamos caracteres aleatorios
+        }
+        return password.ToString(); // Devolvemos la contraseña generada
+    }
+
+    // Método para convertir la contraseña a un sistema de numeración específico (Binario, Octal, Hexadecimal)
+    static string ConvertPassword(string password, string conversionOption)
+    {
+        StringBuilder convertedPassword = new StringBuilder();
+
+        foreach (char c in password)
+        {
+            if (conversionOption == "2" || conversionOption == "5") // Binario
+                convertedPassword.Append(Convert.ToString(c, 2).PadLeft(8, '0') + " ");
+            if (conversionOption == "3" || conversionOption == "5") // Octal
+                convertedPassword.Append(Convert.ToString(c, 8).PadLeft(3, '0') + " ");
+            if (conversionOption == "4" || conversionOption == "5") // Hexadecimal
+                convertedPassword.Append(Convert.ToString(c, 16).PadLeft(2, '0').ToUpper() + " ");
+        }
+
+        return convertedPassword.ToString().Trim(); // Devolvemos la contraseña convertida
+    }
+
+    // Método para mostrar la tabla de codificación de la contraseña
+    static void DisplayEncodingTable(string password)
+    {
+        Console.WriteLine("Caracter | ASCII | Binario      | Hexadecimal");
+        Console.WriteLine("---------|-------|--------------|-------------");
+
+        foreach (char c in password)
+        {
+            string binary = Convert.ToString(c, 2).PadLeft(8, '0');
+            string hex = Convert.ToString(c, 16).PadLeft(2, '0').ToUpper();
+            Console.WriteLine($"{c,-8} | {Convert.ToInt32(c),-5} | {binary} | {hex}"); // Mostramos el carácter, su valor ASCII, binario y hexadecimal
+        }
+    }
+
+    // Método para mostrar una sección con un encabezado
+    static void PrintSectionHeader(string header)
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"\n==== {header} ====");
+        Console.ResetColor();
+    }
+
+    // Método para imprimir un mensaje enmarcado
+    static void PrintBoxedMessage(string message)
+    {
+        Console.WriteLine($"| {message.PadRight(50)} |");
+    }
+
+    // Método para imprimir una pregunta
+    static void PrintQuestion(string question)
+    {
+        Console.WriteLine(question);
+    }
+
+    // Método para generar un sal aleatorio
+    static string GenerateSalt()
+    {
+        byte[] saltBytes = new byte[16]; // 16 bytes es un tamaño común para el sal
+        rand.NextBytes(saltBytes); // Llenamos el array de bytes con valores aleatorios
+        return Convert.ToBase64String(saltBytes); // Convertimos el array de bytes en una cadena base64
+    }
+
+    // Método para generar el hash de la contraseña usando SHA-256 con un sal
+    static string GenerateHashWithSalt(string password, string salt)
+    {
+        using (SHA256 sha256 = SHA256.Create())
+        {
+            byte[] passwordBytes = Encoding.UTF8.GetBytes(password + salt); // Concatenamos la contraseña con el sal
+            byte[] hashBytes = sha256.ComputeHash(passwordBytes); // Generamos el hash de la contraseña
+            return BitConverter.ToString(hashBytes).Replace("-", "").ToLower(); // Devolvemos el hash en formato hexadecimal
+        }
+    }
+
+    // Método para mostrar una animación de carga
+    static void LoadingAnimation(string message)
+    {
+        Console.Write(message + "...");
+        for (int i = 0; i < 3; i++)
+        {
+            Console.Write(".");
+            Thread.Sleep(500);
+        }
+        Console.WriteLine(); // Nueva línea después de la animación
+    }
+}
